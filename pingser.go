@@ -97,35 +97,34 @@ func (p *Pingser) Run() error {
 	}
 }
 
-func (p *Pingser) Send(data []byte) error {
+func (p *Pingser) Send(data []byte, pkt ...*Packet) error {
 	if p.conn == nil {
 		return ErrNoConnection
 	}
-	if p.isServerMod {
-		return errors.New("only client mode can be used")
-	}
-	body := &icmp.Echo{
-		ID:   p.id,
-		Seq:  p.sequence,
-		Data: data,
-	}
-	return p.sendICMP(body, p.ipaddr)
-}
+	var (
+		body   *icmp.Echo
+		ipaddr net.Addr
+	)
 
-// SendWitRecv only clients are allowed to use it
-func (p *Pingser) SendWitRecv(pkt *Packet) error {
-	if p.conn == nil {
-		return ErrNoConnection
-	}
 	if !p.isServerMod {
-		return errors.New("only server mode can be used")
+		body = &icmp.Echo{
+			ID:   p.id,
+			Seq:  p.sequence,
+			Data: data,
+		}
+		ipaddr = p.ipaddr
+	} else {
+		if len(pkt) <= 0 {
+			return errors.New("the 'pkt' parameter is missing from server mode")
+		}
+		body = &icmp.Echo{
+			ID:   pkt[0].ID,
+			Seq:  pkt[0].Seq,
+			Data: data,
+		}
+		ipaddr = pkt[0].Src
 	}
-	body := &icmp.Echo{
-		ID:   pkt.ID,
-		Seq:  pkt.Seq,
-		Data: pkt.Data,
-	}
-	return p.sendICMP(body, pkt.Src)
+	return p.sendICMP(body, ipaddr)
 }
 
 func (p *Pingser) Close() {

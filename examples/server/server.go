@@ -20,8 +20,7 @@ func main() {
 
 	server.OnRecv = func(pkt *pingser.Packet) {
 		fmt.Printf("ID: %d  Seq: %d  data: %s\n", pkt.ID, pkt.Seq, string(pkt.Data))
-		pkt.Data = []byte("world")
-		if err := server.SendWitRecv(pkt); err != nil {
+		if err := server.Send([]byte("world"), pkt); err != nil {
 			fmt.Printf("SendWitRecv - error: %s", err)
 		}
 	}
