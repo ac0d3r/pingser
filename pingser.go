@@ -13,7 +13,8 @@ import (
 )
 
 var (
-	ipv4Proto string = "ip4:icmp"
+	ipv4Proto    string        = "ip4:icmp"
+	defaultDelay time.Duration = time.Millisecond * 100
 )
 
 var (
@@ -39,13 +40,13 @@ type Pingser struct {
 	addr     string
 	ipaddr   net.Addr
 
-	// OnRecv is called when Pinger receives and processes a packet
+	// OnRecv is called when Pingser receives and processes a packet
 	OnRecv func(*Packet)
 }
 
 func NewClient(addr string) (*Pingser, error) {
 	client := &Pingser{
-		id:   os.Getpid(),
+		id:   getid(),
 		done: make(chan struct{}),
 		addr: addr,
 	}
@@ -54,7 +55,7 @@ func NewClient(addr string) (*Pingser, error) {
 
 func NewServer() *Pingser {
 	return &Pingser{
-		id:          os.Getpid(),
+		id:          getid(),
 		done:        make(chan struct{}),
 		isServerMod: true,
 	}
@@ -173,7 +174,7 @@ func (p *Pingser) sendICMP(body icmp.MessageBody, toaddr net.Addr) error {
 }
 
 func (p *Pingser) recvICMP(recv chan<- *Packet) error {
-	delay := time.Millisecond * 100
+	delay := defaultDelay
 	for {
 		select {
 		case <-p.done:
@@ -194,13 +195,15 @@ func (p *Pingser) recvICMP(recv chan<- *Packet) error {
 					}
 				}
 				return err
+			} else {
+				delay = defaultDelay
 			}
 
 			if n <= 0 {
 				continue
 			}
 
-			pkt, err := p.processPacket(data)
+			pkt, err := p.processPacket(data[:])
 			if err != nil || pkt == nil {
 				fmt.Printf("recvIcmp - processPacket error:%s\n", err)
 				continue
@@ -266,4 +269,8 @@ func (p *Pingser) resolve() error {
 
 func (p *Pingser) matchID(ID int) bool {
 	return ID == p.id
+}
+
+func getid() int {
+	return os.Getegid() & 0xffff
 }
