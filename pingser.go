@@ -25,7 +25,7 @@ type Packet struct {
 	ID   int
 	Seq  int
 	Data []byte
-	Src  *net.IPAddr
+	Src  net.Addr
 }
 
 type Pingser struct {
@@ -98,7 +98,7 @@ func (p *Pingser) Run() error {
 	}
 }
 
-func (p *Pingser) Send(data []byte, pkt ...*Packet) error {
+func (p *Pingser) Send(data []byte, replyPkt ...*Packet) error {
 	if p.conn == nil {
 		return ErrNoConnection
 	}
@@ -115,15 +115,15 @@ func (p *Pingser) Send(data []byte, pkt ...*Packet) error {
 		}
 		ipaddr = p.ipaddr
 	} else {
-		if len(pkt) <= 0 {
+		if len(replyPkt) <= 0 {
 			return errors.New("the 'pkt' parameter is missing from server mode")
 		}
 		body = &icmp.Echo{
-			ID:   pkt[0].ID,
-			Seq:  pkt[0].Seq,
+			ID:   replyPkt[0].ID,
+			Seq:  replyPkt[0].Seq,
 			Data: data,
 		}
-		ipaddr = pkt[0].Src
+		ipaddr = replyPkt[0].Src
 	}
 	return p.sendICMP(body, ipaddr)
 }
@@ -166,9 +166,11 @@ func (p *Pingser) sendICMP(body icmp.MessageBody, toaddr net.Addr) error {
 		}
 		return err
 	}
-	p.sequence++
-	if p.sequence > 65535 {
-		p.sequence = 0
+	if !p.isServerMod {
+		p.sequence++
+		if p.sequence > 65535 {
+			p.sequence = 0
+		}
 	}
 	return nil
 }
@@ -208,7 +210,7 @@ func (p *Pingser) recvICMP(recv chan<- *Packet) error {
 				fmt.Printf("recvIcmp - processPacket error:%s\n", err)
 				continue
 			}
-			pkt.Src = srcaddr.(*net.IPAddr)
+			pkt.Src = srcaddr
 
 			select {
 			case <-p.done:
@@ -272,5 +274,5 @@ func (p *Pingser) matchID(ID int) bool {
 }
 
 func getid() int {
-	return os.Getegid() & 0xffff
+	return os.Getpid() & 0xffff
 }
